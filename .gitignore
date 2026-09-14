@@ -1,2 +1,3 @@
-./graphics
 .vscode
+graphics/
+build/
