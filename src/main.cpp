@@ -5,18 +5,33 @@
 #include <bn_regular_bg_ptr.h>
 #include <bn_keypad.h>
 #include <bn_log.h>
+#include <bn_vector.h>
+#include <bn_seed_random.h>
 
 int main()
 {
     bn::core::init();
 
+    // this is optimized butano division operator
+    bn::seed_random random;
     bn::sprite_ptr skull_sprite = bn::sprite_items::skull.create_sprite(0, 0);
 
     // TODO: try setting this first invisible, then spawn one of them into vector visibel in random location.
-    bn::optional<bn::sprite_ptr> blood_sprite = bn::sprite_items::blood.create_sprite(10,10);
+    bn::vector<bn::sprite_ptr, 5> blood_sprites_vector;
     
     while (true)
     {
+        if (bn::keypad::a_pressed())
+        {
+            if (blood_sprites_vector.size() == blood_sprites_vector.max_size())
+            {
+                blood_sprites_vector.erase(blood_sprites_vector.begin());
+            } 
+            int x = random.get_int(-120, 120);
+            int y = random.get_int(-80, 80);
+            blood_sprites_vector.push_back(bn::sprite_items::blood.create_sprite(x, y));
+         }
+
         if (bn::keypad::left_held())
         {
             BN_LOG("Left held");
