@@ -7,90 +7,19 @@
 #include <bn_log.h>
 #include <bn_vector.h>
 #include <bn_seed_random.h>
+#include "levels/level.h"
+#include "levels/menu.h"
 
 int main()
 {
     bn::core::init();
 
-    // this is optimized butano division operator
-    bn::seed_random random;
-    bn::sprite_ptr skull_sprite = bn::sprite_items::skull.create_sprite(0, 0);
-
-    // TODO: try setting this first invisible, then spawn one of them into vector visibel in random location.
-    bn::vector<bn::sprite_ptr, 5> blood_sprites_vector;
+    bn::fixed random_seed = menu::init_menu();
+    BN_LOG("SEED: ", random_seed);
+    matopeli::start_level();
     
     while (true)
     {
-        if (bn::keypad::a_pressed())
-        {
-            if (blood_sprites_vector.size() == blood_sprites_vector.max_size())
-            {
-                blood_sprites_vector.erase(blood_sprites_vector.begin());
-            } 
-            int x = random.get_int(-120, 120);
-            int y = random.get_int(-80, 80);
-            blood_sprites_vector.push_back(bn::sprite_items::blood.create_sprite(x, y));
-         }
-
-        if (bn::keypad::left_held())
-        {
-            BN_LOG("Left held");
-            bn::fixed newX = skull_sprite.x();
-            newX -= 2;
-            skull_sprite.set_x(newX);
-        }
-        if (bn::keypad::right_held())
-        {
-            BN_LOG("Right held");
-            bn::fixed newX = skull_sprite.x();
-            newX += 2;
-            skull_sprite.set_x(newX);
-        }
-
-        if (bn::keypad::up_held())
-        {
-            BN_LOG("Up held");
-            bn::fixed newY = skull_sprite.y();
-            newY -= 2;
-            skull_sprite.set_y(newY);
-        }
-        if (bn::keypad::down_held())
-        {
-            BN_LOG("Down held");
-            bn::fixed newY = skull_sprite.y();
-            newY += 2;
-            skull_sprite.set_y(newY);
-        }
-        
-        
-        if (bn::keypad::start_held())
-        {
-            bn::fixed horizontalScale = skull_sprite.horizontal_scale();
-            bn::fixed verticalScale = skull_sprite.vertical_scale();
-
-            horizontalScale += bn::fixed(0.02);
-            verticalScale += bn::fixed(0.02);
-            skull_sprite.set_horizontal_scale(horizontalScale);
-            skull_sprite.set_vertical_scale(verticalScale);
-        }
-        if (bn::keypad::select_held())
-        {
-            bn::fixed horizontalScale = skull_sprite.horizontal_scale();
-            bn::fixed verticalScale = skull_sprite.vertical_scale();
-
-            horizontalScale -= bn::fixed(0.02);
-            verticalScale -= bn::fixed(0.02);
-            skull_sprite.set_horizontal_scale(horizontalScale);
-            skull_sprite.set_vertical_scale(verticalScale);
-        }
-
-        bn::fixed rotation = skull_sprite.rotation_angle();
-        rotation += bn::fixed(0.5);
-        skull_sprite.set_rotation_angle_safe(rotation);
-        // set_rotaion_angle() function also exist but it requires values between 0 and 360
-
-        // Coordinates
-        // BN_LOG("Sprite location: ", skull_sprite.x(), skull_sprite.y());
         bn::core::update();
     }
-}
+};
