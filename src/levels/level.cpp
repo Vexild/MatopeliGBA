@@ -1,5 +1,6 @@
 #include "level.h"
 #include <bn_core.h>
+#include <bn_fixed.h>
 #include <bn_sprite_ptr.h>
 #include <bn_vector.h>
 #include <bn_sprite_text_generator.h>
@@ -9,9 +10,10 @@
 #include <bn_keypad.h>
 #include <bn_log.h>
 
-int matopeli::start_level()
+int matopeli::start_level(int seed_root = 123456)
 {
-    bn::seed_random random;
+    unsigned int u_seed_root = seed_root;
+    bn::seed_random random(u_seed_root);
     bn::sprite_ptr skull_sprite = bn::sprite_items::skull.create_sprite(0, 0);
 
     bn::vector<bn::sprite_ptr, 5> blood_sprites_vector;

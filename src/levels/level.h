@@ -3,7 +3,9 @@
 
 namespace matopeli
 {
-    int start_level();
+    int start_level(
+        int seed_root
+    );
 }
 
 #endif
