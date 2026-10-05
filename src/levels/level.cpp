@@ -1,7 +1,12 @@
+#include <array>
+#include <string>
+#include <vector>
 #include "level.h"
 #include <bn_memory.h>
 #include <bn_core.h>
 #include <bn_fixed.h>
+#include <bn_timer.h>
+#include <bn_timers.h>
 #include <bn_point.h>
 #include <bn_sprite_ptr.h>
 #include <bn_regular_bg_ptr.h>
@@ -17,43 +22,62 @@
 #include <bn_log.h>
 #include "../worm.h"
 
-using namespace mato;
-
 int matopeli::start_level(int seed_root = 123456)
 {
     unsigned int u_seed_root = seed_root;
     bn::seed_random random(u_seed_root);
 
-    constexpr int cell_size = 8;
-    constexpr int map_width = 9;
-    constexpr int map_height = 7;
+    constexpr int CELL_SIZE = 8;
+    constexpr int MAP_WIDTH = 9;
+    constexpr int MAP_HEIGHT = 7;
+
+    struct Cell
+    {
+        int x;
+        int y;
+    };
+
+    enum class Direction
+    {
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT
+    };
+
+    // Hoping this may come handy later
+    using Map = std::array<std::array<int, MAP_WIDTH>, MAP_HEIGHT>;
+    Map map = {};
 
     bn::regular_bg_ptr map_bg = bn::regular_bg_items::matopeli_level.create_bg(0, 0);
-    // bn::sprite_ptr worm_head= bn::sprite_items::simple_worm.create_sprite(5,5,2);
-    // bn::fixed_point worm_head_position = worm_head.position();
-    // bn::sprite_ptr worm_tail = bn::sprite_items::simple_worm.create_sprite(worm_head_position.x(), worm_head_position.y()+8,8);
 
-    mato::Worm worm;
+    struct Worm
+    {
+        std::vector<Cell> body;
+        Direction dir;
+    };
+
+    Worm worm;
+    worm.body = {
+        {4, 3},
+        {3, 3},
+        {2, 3},
+    };
+
     bn::vector<bn::sprite_ptr, 100> worm_sprites;
-
-    const auto &worm_body = worm.mato_body_data();
-
-    BN_LOG("worm body: ", worm_body.size());
-    // draw the worm
-    auto update_worm = [&](mato::Worm::direction_map direction) {
+    
+    // draw the worm. TODO: So far we only render the head. Code wont render rest of the worm.
+    auto update_worm = [&]()
+    {
         worm_sprites.clear();
-        worm.update_worm(direction);
-
-        for (int i = 0; i <= worm_body.size() - 1; i++)
+        for (int i = 0; i <= worm.body.size() - 1; i++)
         {
-            const auto cell = mato::cell_position(worm_body[i].x, worm_body[i].y, worm_body[i].dir);
-            BN_LOG("BODY: ", cell.x, cell.y, cell.dir);
-
+            const auto cell = mato::cell_position(worm.body[i].x, worm.body[i].y);
             if (i == 0)
             {
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
             }
-            if (i == worm_body.size())
+            if (i == worm.body.size())
             {
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
             }
@@ -64,13 +88,80 @@ int matopeli::start_level(int seed_root = 123456)
         };
     };
 
+    bn::timer timer;
+    uint64_t ticks = 0;
+    uint64_t speed = 1.00;
+    uint64_t frame_limit = 20;
+    bool turbo = false;
+
     while (true)
     {
-        BN_LOG("START");
-        if (bn::keypad::a_pressed())
-        {
-            update_worm(mato::Worm::direction_map::HEAD_UP);
+        Cell next_head = worm.body.front();
+
+        ticks += timer.elapsed_ticks_with_restart();
+        int frames = ticks / bn::timers::ticks_per_frame();
+        BN_LOG("frames: ",frames, ", SPEED: ", int(speed));
+        if (turbo) {
+            frame_limit = 10;
+        } else {
+            frame_limit = 20;
         }
+        if (frames >= frame_limit) {
+            BN_LOG("MOVING WORM");
+            switch (worm.dir)
+            {
+                case Direction::UP:
+                next_head.y -= speed;
+                break;
+                case Direction::DOWN:
+                next_head.y += speed;
+                break;
+                case Direction::LEFT:
+                next_head.x -= speed;
+                break;
+                case Direction::RIGHT:
+                next_head.x += speed;
+                break;
+                default:
+                break;
+            };
+           ticks = 0;
+        }
+
+        worm.body.front() = next_head;
+        update_worm();
+        
+        // Controls need a polar-limiter: no turning 180 degrees.
+        if (bn::keypad::up_pressed())
+        {
+            worm.dir = Direction::UP;
+        };
+        if (bn::keypad::down_pressed())
+        {
+            worm.dir = Direction::DOWN;
+        };
+        if (bn::keypad::left_pressed())
+        {
+            worm.dir = Direction::LEFT;
+        };
+        if (bn::keypad::right_pressed())
+        {
+            worm.dir = Direction::RIGHT;
+        };
+        if (bn::keypad::b_held())
+        {
+            turbo = true;
+        };
+        if (bn::keypad::b_released())
+        {
+            turbo = false;
+        };
+        if (bn::keypad::start_pressed())
+        {
+            worm.body[0] = {4, 4};
+        };
+        const Cell &head = worm.body.front();
+        // BN_LOG("head: ", head.x, head.y, "size: ", worm.body.size(), "dir: ", (int)worm.dir);
         bn::core::update();
     };
 };

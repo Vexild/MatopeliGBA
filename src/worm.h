@@ -59,7 +59,6 @@ namespace mato
         {
             size += 1;
         }
-        void update_worm(direction_map direction);
 
     private:
         bn::vector<cell_position, 100> mato_vector_;
