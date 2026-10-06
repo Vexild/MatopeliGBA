@@ -16,6 +16,7 @@ int main()
 
     int random_seed = menu::init_menu();
     BN_LOG("SEED: ", random_seed);
+    //matopeli::start_test_level(random_seed);
     matopeli::start_level(random_seed);
     
     while (true)
