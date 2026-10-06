@@ -22,6 +22,20 @@
 #include <bn_log.h>
 #include "../worm.h"
 
+enum class Direction
+{
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
+};
+
+struct Cell
+{
+    int x;
+    int y;
+};
+
 int matopeli::start_level(int seed_root = 123456)
 {
     unsigned int u_seed_root = seed_root;
@@ -30,20 +44,6 @@ int matopeli::start_level(int seed_root = 123456)
     constexpr int CELL_SIZE = 8;
     constexpr int MAP_WIDTH = 9;
     constexpr int MAP_HEIGHT = 7;
-
-    struct Cell
-    {
-        int x;
-        int y;
-    };
-
-    enum class Direction
-    {
-        UP,
-        DOWN,
-        LEFT,
-        RIGHT
-    };
 
     // Hoping this may come handy later
     using Map = std::array<std::array<int, MAP_WIDTH>, MAP_HEIGHT>;
@@ -62,10 +62,20 @@ int matopeli::start_level(int seed_root = 123456)
         {4, 3},
         {3, 3},
         {2, 3},
+        {2, 2},
+        {2, 1},
     };
+    worm.dir = Direction::UP;
 
     bn::vector<bn::sprite_ptr, 100> worm_sprites;
-    
+    bn::timer timer;
+    uint64_t ticks = 0;
+    uint64_t speed = 1.00;
+    uint64_t frame_limit;
+    Direction current_direction = Direction::UP;
+    bool turbo = false;
+    bool direction_input_lock = false;
+
     // draw the worm. TODO: So far we only render the head. Code wont render rest of the worm.
     auto update_worm = [&]()
     {
@@ -75,78 +85,92 @@ int matopeli::start_level(int seed_root = 123456)
             const auto cell = mato::cell_position(worm.body[i].x, worm.body[i].y);
             if (i == 0)
             {
+                // BN_LOG("Head on: ",cell.x, cell.y);
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
             }
-            if (i == worm.body.size())
+            if (i < worm.body.size())
             {
+                // BN_LOG(i, " part on: ", cell.x, cell.y);
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
             }
             else
             {
+                // BN_LOG("Tail on: ", cell.x, cell.y);
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
             }
         };
     };
 
-    bn::timer timer;
-    uint64_t ticks = 0;
-    uint64_t speed = 1.00;
-    uint64_t frame_limit = 20;
-    bool turbo = false;
+    auto shift_body = [&]()
+    {
+        for (int w = worm.body.size() - 1; w > 0; w--)
+        {
+            worm.body[w].x = worm.body[w - 1].x;
+            worm.body[w].y = worm.body[w - 1].y;
+        }
+    };
+    auto opposite_dir = [&](Direction dir)
+    {
+        BN_LOG("Opposite? ", (int)dir != (int)current_direction);
+        return (int)dir != (int)current_direction;
+    };
 
     while (true)
     {
-        Cell next_head = worm.body.front();
+        Cell worm_head = worm.body.front();
 
         ticks += timer.elapsed_ticks_with_restart();
-        int frames = ticks / bn::timers::ticks_per_frame();
-        BN_LOG("frames: ",frames, ", SPEED: ", int(speed));
-        if (turbo) {
-            frame_limit = 10;
-        } else {
-            frame_limit = 20;
-        }
-        if (frames >= frame_limit) {
-            BN_LOG("MOVING WORM");
+        uint64_t frames = ticks / bn::timers::ticks_per_frame();
+        frame_limit = turbo ? 10 : 20;
+        if (frames >= frame_limit)
+        {
             switch (worm.dir)
             {
-                case Direction::UP:
-                next_head.y -= speed;
+            case Direction::UP:
+                worm_head.y -= speed;
                 break;
-                case Direction::DOWN:
-                next_head.y += speed;
+            case Direction::DOWN:
+                worm_head.y += speed;
                 break;
-                case Direction::LEFT:
-                next_head.x -= speed;
+            case Direction::LEFT:
+                worm_head.x -= speed;
                 break;
-                case Direction::RIGHT:
-                next_head.x += speed;
+            case Direction::RIGHT:
+                worm_head.x += speed;
                 break;
-                default:
+            default:
                 break;
             };
-           ticks = 0;
-        }
+            shift_body();
+            worm.body.front() = worm_head;
+            direction_input_lock = false;
+            ticks = 0;
+        };
 
-        worm.body.front() = next_head;
-        update_worm();
-        
-        // Controls need a polar-limiter: no turning 180 degrees.
-        if (bn::keypad::up_pressed())
+        // Controls need a input lock: Time when we cannot take in inputs
+        if (bn::keypad::up_pressed() && opposite_dir(Direction::DOWN) && !direction_input_lock)
         {
+            current_direction = Direction::UP;
             worm.dir = Direction::UP;
+            direction_input_lock = true;
         };
-        if (bn::keypad::down_pressed())
+        if (bn::keypad::down_pressed() && opposite_dir(Direction::UP) && !direction_input_lock)
         {
+            current_direction = Direction::DOWN;
             worm.dir = Direction::DOWN;
+            direction_input_lock = true;
         };
-        if (bn::keypad::left_pressed())
+        if (bn::keypad::left_pressed() && opposite_dir(Direction::RIGHT) && !direction_input_lock)
         {
+            current_direction = Direction::LEFT;
             worm.dir = Direction::LEFT;
+            direction_input_lock = true;
         };
-        if (bn::keypad::right_pressed())
+        if (bn::keypad::right_pressed() && opposite_dir(Direction::LEFT) && !direction_input_lock)
         {
+            current_direction = Direction::RIGHT;
             worm.dir = Direction::RIGHT;
+            direction_input_lock = true;
         };
         if (bn::keypad::b_held())
         {
@@ -160,8 +184,9 @@ int matopeli::start_level(int seed_root = 123456)
         {
             worm.body[0] = {4, 4};
         };
-        const Cell &head = worm.body.front();
-        // BN_LOG("head: ", head.x, head.y, "size: ", worm.body.size(), "dir: ", (int)worm.dir);
+        // const Cell &head = worm.body.front();
+        //  BN_LOG("head: ", head.x, head.y, "size: ", worm.body.size(), "dir: ", (int)worm.dir);
+        update_worm();
         bn::core::update();
     };
 };
