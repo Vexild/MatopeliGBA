@@ -1,7 +1,7 @@
 # Matopeli GBA
 
 Study project for GBA development.
-Star of the show is the [Butano](https://github.com/gvaliente/butano) 
+Star of the show is the [Butano](https://github.com/gvaliente/butano) by GValiente. Greant thanks to them for this library!
 
 
 ## Goal
