@@ -1,6 +1,6 @@
 #include <array>
 #include <string>
-#include <vector>
+#include <bn_vector.h>
 #include "level.h"
 #include <bn_memory.h>
 #include <bn_core.h>
@@ -21,14 +21,6 @@
 #include <bn_keypad.h>
 #include <bn_log.h>
 #include "../worm.h"
-
-enum class Direction
-{
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT
-};
 
 struct Cell
 {
@@ -51,28 +43,14 @@ int matopeli::start_level(int seed_root = 123456)
 
     bn::regular_bg_ptr map_bg = bn::regular_bg_items::matopeli_level.create_bg(0, 0);
 
-    struct Worm
-    {
-        std::vector<Cell> body;
-        Direction dir;
-    };
-
-    Worm worm;
-    worm.body = {
-        {4, 3},
-        {3, 3},
-        {2, 3},
-        {2, 2},
-        {2, 1},
-    };
-    worm.dir = Direction::UP;
-
+    mato::Worm worm;
+    
     bn::vector<bn::sprite_ptr, 100> worm_sprites;
     bn::timer timer;
     uint64_t ticks = 0;
     uint64_t speed = 1.00;
     uint64_t frame_limit;
-    Direction current_direction = Direction::UP;
+    mato::Direction current_direction = mato::Direction::UP;
     bool turbo = false;
     bool direction_input_lock = false;
 
@@ -80,18 +58,21 @@ int matopeli::start_level(int seed_root = 123456)
     auto update_worm = [&]()
     {
         worm_sprites.clear();
-        for (int i = 0; i <= worm.body.size() - 1; i++)
+        for (int i = 0; i <= worm.get_body_size() - 1; i++)
         {
-            const auto cell = mato::cell_position(worm.body[i].x, worm.body[i].y);
+            bn::vector<mato::cell_position, 100> worm_body = worm.get_body();
+            auto cell = mato::cell_position(worm_body[i].x, worm_body[i].y, worm_body[i].dir);
             if (i == 0)
             {
                 // BN_LOG("Head on: ",cell.x, cell.y);
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
             }
-            if (i < worm.body.size())
+            else if (i == worm.get_body_size() - 1)
             {
-                // BN_LOG(i, " part on: ", cell.x, cell.y);
+                //BN_LOG(i, "TAIL PART : ", cell.x, cell.y);
+                // TODO: Get the proper orientation with worm.cpp. We dont want to include the logic here, only draw the sprites.
                 worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, cell.dir));
+                // worm_sprites.push_back(bn::sprite_items::simple_worm.create_sprite(cell.x * 8, cell.y * 8, worm.get_tail_sprite(worm.get_body()[i], worm.get_body()[i-1])));
             }
             else
             {
@@ -101,75 +82,68 @@ int matopeli::start_level(int seed_root = 123456)
         };
     };
 
-    auto shift_body = [&]()
+    auto opposite_dir = [&](mato::Direction dir)
     {
-        for (int w = worm.body.size() - 1; w > 0; w--)
-        {
-            worm.body[w].x = worm.body[w - 1].x;
-            worm.body[w].y = worm.body[w - 1].y;
-        }
-    };
-    auto opposite_dir = [&](Direction dir)
-    {
-        BN_LOG("Opposite? ", (int)dir != (int)current_direction);
+        //BN_LOG("Opposite? ", (int)dir != (int)current_direction);
         return (int)dir != (int)current_direction;
     };
 
     while (true)
     {
-        Cell worm_head = worm.body.front();
+        mato::cell_position worm_head = worm.get_body()[0];
 
         ticks += timer.elapsed_ticks_with_restart();
         uint64_t frames = ticks / bn::timers::ticks_per_frame();
         frame_limit = turbo ? 10 : 20;
         if (frames >= frame_limit)
         {
-            switch (worm.dir)
+            switch (worm.get_current_direction())
             {
-            case Direction::UP:
+            case mato::Direction::UP:
                 worm_head.y -= speed;
                 break;
-            case Direction::DOWN:
+            case mato::Direction::DOWN:
                 worm_head.y += speed;
                 break;
-            case Direction::LEFT:
+            case mato::Direction::LEFT:
                 worm_head.x -= speed;
                 break;
-            case Direction::RIGHT:
+            case mato::Direction::RIGHT:
                 worm_head.x += speed;
                 break;
             default:
                 break;
             };
-            shift_body();
-            worm.body.front() = worm_head;
+            // shift all worm segments
+            worm.shift_body(worm_head);
+            
             direction_input_lock = false;
             ticks = 0;
         };
 
         // Controls need a input lock: Time when we cannot take in inputs
-        if (bn::keypad::up_pressed() && opposite_dir(Direction::DOWN) && !direction_input_lock)
+        if (bn::keypad::up_pressed() && opposite_dir(mato::Direction::DOWN) && !direction_input_lock)
         {
-            current_direction = Direction::UP;
-            worm.dir = Direction::UP;
+            current_direction = mato::Direction::UP;
+            worm.set_direction(mato::Direction::UP);
             direction_input_lock = true;
         };
-        if (bn::keypad::down_pressed() && opposite_dir(Direction::UP) && !direction_input_lock)
+        if (bn::keypad::down_pressed() && opposite_dir(mato::Direction::UP) && !direction_input_lock)
         {
-            current_direction = Direction::DOWN;
-            worm.dir = Direction::DOWN;
+            current_direction = mato::Direction::DOWN;
+            worm.set_direction(mato::Direction::DOWN);
             direction_input_lock = true;
         };
-        if (bn::keypad::left_pressed() && opposite_dir(Direction::RIGHT) && !direction_input_lock)
+        if (bn::keypad::left_pressed() && opposite_dir(mato::Direction::RIGHT) && !direction_input_lock)
         {
-            current_direction = Direction::LEFT;
-            worm.dir = Direction::LEFT;
+            current_direction = mato::Direction::LEFT;
+            worm.set_direction(mato::Direction::LEFT);
             direction_input_lock = true;
         };
-        if (bn::keypad::right_pressed() && opposite_dir(Direction::LEFT) && !direction_input_lock)
+        if (bn::keypad::right_pressed() && opposite_dir(mato::Direction::LEFT) && !direction_input_lock)
         {
-            current_direction = Direction::RIGHT;
-            worm.dir = Direction::RIGHT;
+            current_direction = mato::Direction::RIGHT;
+            worm.set_direction(mato::Direction::RIGHT);
             direction_input_lock = true;
         };
         if (bn::keypad::b_held())
@@ -182,7 +156,7 @@ int matopeli::start_level(int seed_root = 123456)
         };
         if (bn::keypad::start_pressed())
         {
-            worm.body[0] = {4, 4};
+            worm.reset();
         };
         // const Cell &head = worm.body.front();
         //  BN_LOG("head: ", head.x, head.y, "size: ", worm.body.size(), "dir: ", (int)worm.dir);

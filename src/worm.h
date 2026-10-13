@@ -1,11 +1,19 @@
 #ifndef WORM_H
 #define WORM_H
 #include <bn_core.h>
+#include <bn_log.h>
 #include <bn_vector.h>
 #include <bn_sprite_ptr.h>
 
 namespace mato
 {
+    enum class Direction
+    {
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT
+    };
     struct cell_position
     {
         int x;
@@ -16,8 +24,7 @@ namespace mato
     class Worm
     {
     public:
-        int size = 3;
-        enum direction_map
+        enum segment_map
         {
             HEAD_UP = 2,
             HEAD_LEFT = 1,
@@ -34,35 +41,52 @@ namespace mato
             TAIL_DOWN = 12,
             TAIL_LEFT = 13
         };
-        Worm()
-        {
-            push_to_body(cell_position{5, 5, Worm::direction_map::HEAD_UP});
-            push_to_body(cell_position{4, 5, Worm::direction_map::BODY_VERTICAL});
-            push_to_body(cell_position{3, 5, Worm::direction_map::TAIL_UP});
-        }
+        Worm();
 
-        void set_direction(direction_map new_direction);
-        Worm::direction_map get_direction()
+        void set_direction(Direction new_direction);
+        Direction get_current_direction()
         {
-            return Worm::direction_;
+            return Worm::current_direction_;
         };
-        const bn::vector<cell_position, 100> &mato_body_data() const
+        bn::vector<cell_position, 100> get_body() const
         {
-            return mato_vector_;
+            return body_;
+        };
+        void set_body(bn::vector<cell_position, 100> new_body)
+        {
+            body_ = new_body;
+        };
+        void set_current_direction(Direction new_direction)
+        {
+            current_direction_ = new_direction;
         };
         void push_to_body(cell_position cell_position);
-        int get_size()
+        int get_body_size()
         {
-            return size;
+            return body_.size();
         };
-        void increase_size()
+        void shift_body(mato::cell_position new_head)
         {
-            size += 1;
+            for (int w = get_body_size() - 1; w > 0; --w)
+            {
+                body_[w].x = body_[w - 1].x;
+                body_[w].y = body_[w - 1].y;
+                BN_LOG("body 0 x: ", body_[0].x);
+                BN_LOG("body 0 y: ", body_[0].y);
+            };
+            body_[0] = new_head;
+        };
+        void reset()
+        {
+            body_[0].x = 4;
+            body_[0].y = 4;
         }
 
+        segment_map get_tail_sprite(cell_position tail, cell_position second_last);
+
     private:
-        bn::vector<cell_position, 100> mato_vector_;
-        direction_map direction_ = direction_map::HEAD_UP;
+        bn::vector<cell_position, 100> body_;
+        Direction current_direction_;
     };
 }
 
